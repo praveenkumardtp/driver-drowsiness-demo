@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Driver Drowsiness Demo</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <h2>Driver Drowsiness Detection — Live Demo</h2>
+  <div id="video-wrap">
+    <video id="video" autoplay playsinline width="640" height="480"></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+  </div>
+
+  <div id="status">
+    <p>Status: <span id="st">Initializing...</span></p>
+    <p>Closed frames: <span id="closed">0</span></p>
+  </div>
+
+  <audio id="alarmSound" preload="auto">
+    <source src="/static/alarm.mp3" type="audio/mpeg">
+  </audio>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>
