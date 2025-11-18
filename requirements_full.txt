@@ -4,5 +4,4 @@ python-socketio==5.9.0
 eventlet==0.33.3
 opencv-python==4.8.0.74
 tensorflow==2.13.0
-pillow==10.0.0
 numpy==1.25.0
