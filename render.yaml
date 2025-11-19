@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: driver-drowsiness-demo
+    runtime: python
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python app.py
+    pythonVersion: 3.10
