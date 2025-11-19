@@ -1,5 +1,5 @@
 // drowsy_web.js - uses MediaPipe FaceMesh + EAR (Eye Aspect Ratio)
-// matched to your HTML: video#video, overlay#overlay, status span#st, closed span#closed, audio#audioSound
+// matched to your HTML: video#video, overlay#overlay, status span#st, closed span#closed, audio#alarmSound
 
 // CONFIG
 const CLOSED_FRAMES_THRESHOLD = 15; // frames (tune)
@@ -64,8 +64,8 @@ function toPixel(coord, videoW, videoH){
 (async () => {
   statusSpan.textContent = 'Initializing...';
 
-  // create face mesh
-  const faceMesh = new FaceMesh.FaceMesh({
+  // create face mesh — CORRECT constructor usage for CDN build
+  const faceMesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
   });
   faceMesh.setOptions({
@@ -79,9 +79,12 @@ function toPixel(coord, videoW, videoH){
 
   // request camera
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
-    video.srcObject = stream;
-    await video.play();
+    // If video already has stream (maybe main.js or others), reuse it
+    if (!video.srcObject) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    }
   } catch (e) {
     statusSpan.textContent = 'Camera permission required';
     console.error('Camera error', e);
@@ -96,8 +99,8 @@ function toPixel(coord, videoW, videoH){
   video.addEventListener('loadedmetadata', syncOverlay);
   syncOverlay();
 
-  // use MediaPipe Camera helper
-  const camera = new Camera.Camera(video, {
+  // use MediaPipe Camera helper — CORRECT usage
+  const camera = new Camera(video, {
     onFrame: async () => {
       await faceMesh.send({ image: video });
     },
