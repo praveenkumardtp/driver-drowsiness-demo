@@ -1,6 +1,9 @@
+// main.js - sends small frames to server (non-blocking, waits for camera started by drowsy_web.js)
+
 const socket = io();
 
-const video = document.getElementById('video');
+// Use a different variable name to avoid re-declaration conflicts
+const camVideo = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const ctx = overlay.getContext('2d');
 const statusEl = document.getElementById('st');
@@ -8,55 +11,60 @@ const closedEl = document.getElementById('closed');
 const alarm = document.getElementById('alarmSound');
 
 const CAPTURE_INTERVAL = 150; // ms
-
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    video.srcObject = stream;
-    video.play();
-    startSendingFrames();
-  } catch (e) {
-    console.error("Camera error", e);
-    statusEl.innerText = 'Camera access denied';
-  }
-}
+let senderInterval = null;
 
 function startSendingFrames() {
+  if (senderInterval) return; // already running
+
   const tmpCanvas = document.createElement('canvas');
   const w = 320, h = 240;
   tmpCanvas.width = w; tmpCanvas.height = h;
   const tctx = tmpCanvas.getContext('2d');
 
-  setInterval(() => {
-    if (video.readyState < 2) return;
-    tctx.drawImage(video, 0, 0, w, h);
-    const dataUrl = tmpCanvas.toDataURL('image/jpeg', 0.6);
-    socket.emit('frame', { image: dataUrl });
+  senderInterval = setInterval(() => {
+    if (!camVideo || camVideo.readyState < 2) return;
+    try {
+      tctx.drawImage(camVideo, 0, 0, w, h);
+      const dataUrl = tmpCanvas.toDataURL('image/jpeg', 0.6);
+      socket.emit('frame', { image: dataUrl });
+    } catch (e) {
+      // sometimes drawImage throws if video not ready
+      console.warn('frame send error', e);
+    }
   }, CAPTURE_INTERVAL);
 }
 
+// If the page's video element already has a stream, start sending right away.
+// Otherwise, poll until a stream becomes available (drowsy_web.js will usually attach it).
+(function waitForVideoThenStart(){
+  if (camVideo && camVideo.srcObject) {
+    startSendingFrames();
+  } else {
+    const iv = setInterval(() => {
+      if (camVideo && camVideo.srcObject) {
+        clearInterval(iv);
+        startSendingFrames();
+      }
+    }, 500);
+  }
+})();
+
 socket.on('connect', () => {
-  statusEl.innerText = 'Connected';
+  // only update UI; detection UI is handled by drowsy_web
+  if (statusEl) statusEl.innerText = 'Connected';
 });
 
 socket.on('drowsiness', (data) => {
   const { drowsy, closed_frames, alarm: playAlarm } = data;
-  closedEl.innerText = closed_frames;
-  statusEl.innerText = drowsy ? 'DROWSY' : 'Alert';
-
-  ctx.clearRect(0,0,overlay.width, overlay.height);
-  ctx.font = "30px Arial";
-  ctx.fillStyle = drowsy ? "rgba(255,0,0,0.8)" : "rgba(0,255,0,0.6)";
-  ctx.fillText(drowsy ? "DROWSY" : "Alert", 10, 40);
+  if (closedEl) closedEl.innerText = closed_frames;
+  if (statusEl) statusEl.innerText = drowsy ? 'DROWSY' : 'Alert';
 
   if (playAlarm) {
     try {
       alarm.currentTime = 0;
-      alarm.play();
+      alarm.play().catch(()=>{ /* may be blocked until user interaction */ });
     } catch (e) {
       console.log('Alarm play blocked', e);
     }
   }
 });
-
-startCamera();
