@@ -4,7 +4,7 @@ import base64
 import time
 from collections import deque
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, has_request_context
 from flask_socketio import SocketIO, emit
 
 import numpy as np
