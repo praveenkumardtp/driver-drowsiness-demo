@@ -37,6 +37,7 @@ CONSEC_FRAMES_FOR_DROWSY = 20
 # session tracker
 session_states = {}
 
+
 def preprocess_eye_cv2(eye_img):
     # eye_img: numpy grayscale
     try:
@@ -71,7 +72,10 @@ def index():
 
 @socketio.on('frame')
 def handle_frame(data):
-    sid = request.sid
+    sid = safe_sid()
+    if sid is None:
+        return
+
     payload = data.get('image', '')
     if not payload:
         return
@@ -140,11 +144,15 @@ def handle_frame(data):
 
 @socketio.on('connect')
 def on_connect():
-    emit('connected', {'msg':'connected'})
+    sid = safe_sid()
+    # sid may be None sometimes — this is normal on Render
+    emit('connected', {'msg': 'connected'})
 
 @socketio.on('disconnect')
 def on_disconnect():
-    sid = request.sid
+   sid = safe_sid()
+if sid is None:
+    return
     session_states.pop(sid, None)
 
 if __name__ == '__main__':
