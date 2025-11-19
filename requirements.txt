@@ -1,7 +1,8 @@
+Flask
+flask-socketio
+eventlet
+gunicorn
 opencv-python
 numpy
+Pillow
 pygame
-Flask
-gunicorn
-
-
