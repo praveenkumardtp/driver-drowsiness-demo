@@ -37,6 +37,14 @@ CONSEC_FRAMES_FOR_DROWSY = 20
 # session tracker
 session_states = {}
 
+# helper to safely obtain request.sid only when a request context exists
+def safe_sid():
+    if has_request_context():
+        try:
+            return request.sid
+        except Exception:
+            return None
+    return None
 
 def preprocess_eye_cv2(eye_img):
     # eye_img: numpy grayscale
@@ -80,13 +88,18 @@ def handle_frame(data):
     if not payload:
         return
     header, b64 = payload.split(',', 1) if ',' in payload else ('', payload)
-    img_bytes = base64.b64decode(b64)
+    try:
+        img_bytes = base64.b64decode(b64)
+    except Exception:
+        return
     arr = np.frombuffer(img_bytes, dtype=np.uint8)
 
     # Try to decode via OpenCV if available, else use PIL
     frame = None
     if HAS_CV2:
         frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     else:
         img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
@@ -108,16 +121,20 @@ def handle_frame(data):
                 eye_img = face_gray[ey:ey+eh, ex:ex+ew]
                 if model is not None:
                     proc = preprocess_eye_cv2(eye_img)
-                    if proc is None: continue
-                    p = float(model.predict(proc)[0][0])
-                    is_open = p >= 0.5
+                    if proc is None:
+                        continue
+                    try:
+                        p = float(model.predict(proc)[0][0])
+                        is_open = p >= 0.5
+                    except Exception:
+                        is_open = True
                     eye_states.append(is_open)
                 else:
                     # heuristic: if mean intensity very low -> closed (blink)
-                    meanv = np.mean(eye_img)
+                    meanv = np.mean(eye_img) if eye_img.size else 255
                     is_open = meanv > 60  # heuristic threshold
                     eye_states.append(is_open)
-            if len(eye_states)>0:
+            if len(eye_states) > 0:
                 eye_closed_flag = all(not s for s in eye_states)
                 break
     else:
@@ -150,10 +167,11 @@ def on_connect():
 
 @socketio.on('disconnect')
 def on_disconnect():
-   sid = safe_sid()
-if sid is None:
-    return
+    sid = safe_sid()
+    if sid is None:
+        return
     session_states.pop(sid, None)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
